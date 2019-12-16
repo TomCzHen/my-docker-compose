@@ -1,0 +1,89 @@
+version: "3.7"
+
+x-zabbix-server-variables: &zabbix-server-variables
+  ZBX_SERVER_HOST: ${ZBX_SERVER_HOST}
+  ZBX_SERVER_PORT: ${ZBX_SERVER_PORT}
+
+x-zabbix-agent-variables: &zabbix-agent-variables
+  <<: *zabbix-server-variables
+  ZBX_HOSTNAME: ${ZBX_AGENT_HOSTNAME}
+
+x-zabbix-web-variables: &zabbix-web-variables
+  ZBX_SERVER_NAME: ${ZBX_SERVER_NAME}
+  PHP_TZ: ${TIME_ZONE}
+  ZBX_MAXEXECUTIONTIME: ${ZBX_MAXEXECUTIONTIME}
+  ZBX_MEMORYLIMIE: 128M
+  ZBX_POSTMAXSIZE: 16M
+  ZBX_UPLOADMAXFILESIZE: 2M
+  ZBX_SESSION_NAME: zbx_sessionid
+
+x-zabbix-db-variables: &zabbix-db-variables
+  DB_SERVER_HOST: ${DB_SERVER_HOST}
+  DB_SERVER_PORT: ${DB_SERVER_PORT}
+  POSTGRES_DB: ${DATABASE_NAME}
+  POSTGRES_USER: ${DATABASE_USER}
+  POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+
+services: 
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:${ZBX_VERSION}
+    restart: unless-stopped
+    ports: 
+      - 10051:10051
+    depends_on: 
+      - zabbix-db
+    environment: 
+      <<: *zabbix-db-variables
+    networks:
+      zabbix-network:
+        aliases:
+          - ${ZBX_SERVER_HOST}
+  zabbix-server-agent:
+    image: zabbix/zabbix-agent:${ZBX_VERSION}
+    restart: unless-stopped
+    environment: 
+      <<: *zabbix-agent-variables
+    volumes: 
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/zabbix_agentd.d
+        target: /etc/zabbix/zabbix_agentd.d
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/modules
+        target: /var/lib/zabbix/modules
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/enc
+        target: /var/lib/zabbix/enc
+    networks:
+      zabbix-network:
+        aliases: 
+          - ${ZBX_AGENT_HOSTNAME}
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:${ZBX_VERSION}
+    restart: unless-stopped
+    depends_on: 
+      - zabbix-server
+      - zabbix-db
+    environment: 
+      <<: *zabbix-server-variables
+      <<: *zabbix-db-variables
+      <<: *zabbix-web-variables
+    ports: 
+      - 8001:80
+    networks: 
+      zabbix-network:
+  zabbix-db:
+    image: postgres:11.6
+    restart: unless-stopped
+    environment: 
+      <<: *zabbix-db-variables
+    networks: 
+      zabbix-network:
+        aliases:
+          - ${DB_SERVER_HOST}
+    volumes: 
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/data
+        target: /var/lib/postgresql/data
+
+networks: 
+  zabbix-network:
