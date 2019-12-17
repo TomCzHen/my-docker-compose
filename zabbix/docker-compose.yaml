@@ -47,12 +47,15 @@ services:
       - type: bind
         source: ${ZBX_VOLUMES_ROOT}/zabbix_agentd.d
         target: /etc/zabbix/zabbix_agentd.d
+        read_only: true
       - type: bind
         source: ${ZBX_VOLUMES_ROOT}/modules
         target: /var/lib/zabbix/modules
+        read_only: true
       - type: bind
         source: ${ZBX_VOLUMES_ROOT}/enc
         target: /var/lib/zabbix/enc
+        read_only: true
     networks:
       zabbix-network:
         aliases: 
