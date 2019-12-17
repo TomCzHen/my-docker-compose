@@ -5,8 +5,12 @@ x-zabbix-server-variables: &zabbix-server-variables
   ZBX_SERVER_PORT: ${ZBX_SERVER_PORT}
 
 x-zabbix-agent-variables: &zabbix-agent-variables
-  <<: *zabbix-server-variables
   ZBX_HOSTNAME: ${ZBX_AGENT_HOSTNAME}
+  ZBX_SERVER_HOST: ${ZBX_SERVER_HOST}
+  ZBX_PASSIVE_ALLOW: ${ZBX_PASSIVE_ALLOW}
+  ZBX_PASSIVESERVERS: ${ZBX_PASSIVESERVERS}
+  ZBX_ACTIVE_ALLOW: ${ZBX_ACTIVE_ALLOW}
+  ZBX_ACTIVESERVERS: ${ZBX_ACTIVESERVERS}
 
 x-zabbix-web-variables: &zabbix-web-variables
   ZBX_SERVER_NAME: ${ZBX_SERVER_NAME}
@@ -38,11 +42,47 @@ services:
       zabbix-network:
         aliases:
           - ${ZBX_SERVER_HOST}
+    volumes:
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/alertscripts
+        target: /usr/lib/zabbix/alertscripts
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/externalscripts
+        target: /usr/lib/zabbix/externalscripts
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/modules
+        target: /var/lib/zabbix/modules
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/enc
+        target: /var/lib/zabbix/enc
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/ssh_keys
+        target: /var/lib/zabbix/ssh_keys
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/certs
+        target: /var/lib/zabbix/ssl/certs
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/keys
+        target: /var/lib/zabbix/ssl/keys
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/ssl_ca
+        target: /var/lib/zabbix/ssl/ssl_ca
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/snmptraps
+        target: /var/lib/zabbix/snmptraps
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/mibs
+        target: /var/lib/zabbix/mibs
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/export
+        target: /var/lib/zabbix/export
   zabbix-server-agent:
     image: zabbix/zabbix-agent:${ZBX_VERSION}
     restart: unless-stopped
     environment: 
       <<: *zabbix-agent-variables
+    depends_on:
+      - zabbix-server
     volumes: 
       - type: bind
         source: ${ZBX_VOLUMES_ROOT}/zabbix_agentd.d
@@ -58,7 +98,7 @@ services:
         read_only: true
     networks:
       zabbix-network:
-        aliases: 
+        aliases:
           - ${ZBX_AGENT_HOSTNAME}
   zabbix-web:
     image: zabbix/zabbix-web-nginx-pgsql:${ZBX_VERSION}
@@ -72,6 +112,10 @@ services:
       <<: *zabbix-web-variables
     ports: 
       - 8001:80
+    volumes:
+      - type: bind
+        source: ${ZBX_VOLUMES_ROOT}/nginx
+        target: /etc/ssl/nginx
     networks: 
       zabbix-network:
   zabbix-db:
